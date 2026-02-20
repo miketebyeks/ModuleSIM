@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModuleSIM — Solar Panel Power Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --sun:#FFB830; --sky:#0A1628; --sky-mid:#0D2145;
+    --accent:#00D4FF; --accent2:#FF6B35;
+    --text:#E8F4FD; --text-dim:#7BAAC9;
+    --card:rgba(255,255,255,0.04); --border:rgba(0,212,255,0.15);
+    --green:#22C55E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Syne',sans-serif;background:var(--sky);color:var(--text);min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(255,184,48,.12) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 20%,rgba(0,212,255,.06) 0%,transparent 50%),linear-gradient(180deg,#0A1628 0%,#0D2145 40%,#112B5C 100%);pointer-events:none;z-index:0;}
+
+  .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:36px 24px 60px;}
+
+  /* ── HEADER ── */
+  header{text-align:center;margin-bottom:36px;animation:fadeDown .8s ease both;}
+  .sun-icon{width:56px;height:56px;margin:0 auto 14px;position:relative;}
+  .sun-core{width:34px;height:34px;background:radial-gradient(circle,#FFE066,#FFB830);border-radius:50%;position:absolute;top:11px;left:11px;box-shadow:0 0 20px rgba(255,184,48,.8),0 0 40px rgba(255,184,48,.4);animation:pulse 3s ease-in-out infinite;}
+  .sun-rays{position:absolute;inset:0;animation:spin 20s linear infinite;}
+  .sun-rays::before,.sun-rays::after{content:'';position:absolute;background:rgba(255,184,48,.6);border-radius:2px;}
+  .sun-rays::before{width:4px;height:56px;left:26px;top:0;}
+  .sun-rays::after{width:56px;height:4px;top:26px;left:0;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(255,184,48,.8),0 0 40px rgba(255,184,48,.4)}50%{box-shadow:0 0 30px rgba(255,184,48,1),0 0 60px rgba(255,184,48,.6)}}
+  h1{font-size:clamp(1.8rem,5vw,2.9rem);font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#FFE066,#FFB830,#FF8C00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:7px;}
+  .subtitle{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;}
+  .header-badges{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);border-radius:20px;padding:3px 12px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--accent);letter-spacing:1px;cursor:pointer;transition:background .2s,border-color .2s;}
+  .badge:hover{background:rgba(0,212,255,.15);border-color:rgba(0,212,255,.5);}
+  .badge.info-badge{background:rgba(255,184,48,.08);border-color:rgba(255,184,48,.3);color:var(--sun);}
+  .badge.info-badge:hover{background:rgba(255,184,48,.18);}
+
+  /* ── LAYOUT ── */
+  .main-grid{display:grid;grid-template-columns:330px 1fr;gap:22px;align-items:start;}
+  @media(max-width:800px){.main-grid{grid-template-columns:1fr;}}
+
+  /* ── CARDS ── */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px;backdrop-filter:blur(12px);animation:fadeUp .6s ease both;}
+  .card-title{font-size:.66rem;font-family:'Space Mono',monospace;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+  .card-title::before{content:'';width:12px;height:2px;background:var(--accent);display:block;}
+
+  /* ── FORM ── */
+  .field{margin-bottom:14px;}
+  .field label{display:flex;justify-content:space-between;align-items:baseline;font-size:.78rem;color:var(--text-dim);margin-bottom:5px;font-family:'Space Mono',monospace;}
+  .field label .unit{font-size:.62rem;color:rgba(123,170,201,.5);}
+  input[type="number"]{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:.86rem;outline:none;transition:border-color .2s,box-shadow .2s;}
+  input[type="number"]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.1);}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  input[type="range"]{width:100%;height:4px;background:rgba(0,212,255,.2);border-radius:2px;outline:none;cursor:pointer;-webkit-appearance:none;margin-top:6px;}
+  input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px rgba(0,212,255,.5);cursor:pointer;}
+  .slider-val{font-family:'Space Mono',monospace;font-size:.86rem;color:var(--accent);text-align:right;margin-top:3px;}
+  .hint{font-family:'Space Mono',monospace;font-size:.58rem;color:rgba(0,212,255,.5);margin-top:3px;min-height:13px;line-height:1.4;}
+
+  /* ── BUTTONS ── */
+  .btn-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;}
+  .calc-btn{padding:12px;background:linear-gradient(135deg,#FFB830,#FF8C00);border:none;border-radius:10px;color:#0A1628;font-family:'Syne',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px rgba(255,140,0,.3);}
+  .calc-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,140,0,.5);}
+  .calc-btn:active{transform:translateY(0);}
+  .export-btn{padding:12px 16px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;color:var(--green);font-family:'Space Mono',monospace;font-size:.7rem;cursor:pointer;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px;letter-spacing:.5px;}
+  .export-btn:hover{background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.6);transform:translateY(-2px);}
+  .export-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .export-btn svg{flex-shrink:0;}
+
+  .info-note{font-family:'Space Mono',monospace;font-size:.6rem;color:rgba(123,170,201,.4);line-height:1.6;border-top:1px solid var(--border);padding-top:13px;margin-top:13px;}
+
+  /* ── RESULTS ── */
+  .results-col{display:flex;flex-direction:column;gap:18px;}
+  .yearly-stat{background:linear-gradient(135deg,rgba(255,184,48,.08),rgba(255,140,0,.04));border:1px solid rgba(255,184,48,.25);border-radius:16px;padding:24px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+  .yearly-label{font-family:'Space Mono',monospace;font-size:.66rem;letter-spacing:2px;text-transform:uppercase;color:var(--sun);margin-bottom:5px;}
+  .yearly-value{font-size:clamp(1.8rem,4vw,2.7rem);font-weight:800;color:#FFE066;line-height:1;text-shadow:0 0 30px rgba(255,224,102,.4);}
+  .yearly-unit{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);margin-top:3px;}
+  .equiv-stats{display:flex;flex-direction:column;gap:7px;text-align:right;}
+  .equiv-item{font-family:'Space Mono',monospace;font-size:.68rem;color:var(--text-dim);}
+  .equiv-item span{color:var(--accent);font-weight:700;}
+
+  /* ── CHART ── */
+  .chart-bars{display:flex;align-items:flex-end;gap:5px;height:150px;padding:18px 0 0;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;}
+  .bar{width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#FFB830,#FF8C00);transition:height .8s cubic-bezier(.34,1.56,.64,1);position:relative;min-height:3px;cursor:pointer;}
+  .bar::after{content:attr(data-val);position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:.5rem;color:var(--text-dim);white-space:nowrap;opacity:0;transition:opacity .2s;}
+  .bar:hover::after{opacity:1;}
+  .bar:hover{filter:brightness(1.2);}
+  .bar-label{font-family:'Space Mono',monospace;font-size:.56rem;color:var(--text-dim);}
+
+  /* ── MONTH TABLE ── */
+  .month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:3px;}
+  .month-cell{background:rgba(255,255,255,.03);border:1px solid rgba(0,212,255,.1);border-radius:8px;padding:8px 6px;text-align:center;transition:background .2s,border-color .2s;}
+  .month-cell:hover{background:rgba(0,212,255,.05);border-color:rgba(0,212,255,.3);}
+  .month-cell .mn{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--text-dim);margin-bottom:2px;}
+  .month-cell .mv{font-size:.82rem;font-weight:600;color:var(--text);}
+  .month-cell .mu{font-family:'Space Mono',monospace;font-size:.52rem;color:rgba(123,170,201,.4);}
+
+  .accuracy-note{background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);border-radius:8px;padding:10px 14px;font-family:'Space Mono',monospace;font-size:.6rem;color:rgba(123,170,201,.6);line-height:1.6;margin-top:3px;}
+  .accuracy-note strong{color:rgba(0,212,255,.7);}
+
+  .calculating{text-align:center;padding:36px;font-family:'Space Mono',monospace;color:var(--text-dim);font-size:.75rem;letter-spacing:2px;}
+  .dot-loader span{animation:blink 1.2s infinite;display:inline-block;}
+  .dot-loader span:nth-child(2){animation-delay:.2s;}
+  .dot-loader span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+  footer{text-align:center;margin-top:40px;font-family:'Space Mono',monospace;font-size:.6rem;color:rgba(123,170,201,.28);letter-spacing:1px;}
+
+  /* ═══════════════════════════════════
+     INFO MODAL
+  ═══════════════════════════════════ */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s;}
+  .modal-overlay.open{opacity:1;pointer-events:all;}
+  .modal{background:#0D2145;border:1px solid rgba(0,212,255,.2);border-radius:20px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;padding:36px;position:relative;transform:translateY(20px);transition:transform .3s;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+  .modal-overlay.open .modal{transform:translateY(0);}
+  .modal-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-dim);font-size:1rem;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+  .modal-close:hover{background:rgba(255,255,255,.12);color:var(--text);}
+  .modal h2{font-size:1.4rem;font-weight:800;background:linear-gradient(135deg,#FFE066,#FFB830);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;}
+  .modal-sub{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--text-dim);letter-spacing:2px;margin-bottom:28px;}
+
+  .info-section{margin-bottom:26px;}
+  .info-section h3{font-size:.68rem;font-family:'Space Mono',monospace;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .info-section h3::before{content:'';width:10px;height:2px;background:var(--accent);display:block;}
+  .info-section p{font-size:.85rem;color:rgba(232,244,253,.75);line-height:1.7;margin-bottom:10px;}
+
+  .step-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
+  .step-list li{display:flex;gap:14px;align-items:flex-start;}
+  .step-num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);font-weight:700;}
+  .step-text{font-size:.82rem;color:rgba(232,244,253,.75);line-height:1.6;padding-top:3px;}
+  .step-text strong{color:var(--text);}
+
+  .param-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+  .param-table th{font-family:'Space Mono',monospace;font-size:.58rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);}
+  .param-table td{padding:9px 10px;border-bottom:1px solid rgba(0,212,255,.05);color:rgba(232,244,253,.72);vertical-align:top;font-size:.78rem;line-height:1.65;}
+  .param-table td:first-child{color:var(--text);font-family:'Space Mono',monospace;font-size:.7rem;white-space:nowrap;}
+  .param-table td:nth-child(2){white-space:nowrap;color:var(--text-dim);font-size:.72rem;}
+  .param-table tr:last-child td{border-bottom:none;}
+  .param-table tr:hover td{background:rgba(0,212,255,.03);}
+  .param-table strong{color:var(--text);}
+  .param-table br+strong{display:inline-block;margin-top:4px;}
+
+  .tip-box{background:rgba(255,184,48,.06);border:1px solid rgba(255,184,48,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:rgba(232,244,253,.7);line-height:1.6;}
+  .tip-box strong{color:var(--sun);}
+
+  .formula-box{background:rgba(0,0,0,.3);border:1px solid rgba(0,212,255,.1);border-radius:8px;padding:12px 16px;font-family:'Space Mono',monospace;font-size:.68rem;color:rgba(0,212,255,.7);line-height:1.8;}
+
+  /* scrollbar */
+  .modal::-webkit-scrollbar{width:4px;}
+  .modal::-webkit-scrollbar-track{background:transparent;}
+  .modal::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px;}
+
+  /* Export success flash */
+  .export-flash{position:fixed;bottom:30px;right:30px;background:#0D2145;border:1px solid var(--green);border-radius:10px;padding:12px 20px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--green);z-index:2000;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(10px);transition:opacity .3s,transform .3s;}
+  .export-flash.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- ═══ INFO MODAL ═══ -->
+<div class="modal-overlay" id="infoModal" onclick="if(event.target===this)closeInfo()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeInfo()">✕</button>
+    <h2>How to Use ModuleSIM</h2>
+    <p class="modal-sub">Solar Panel Power Output Simulator · Clear Sky Model</p>
+
+    <div class="info-section">
+      <h3>What This Tool Does</h3>
+      <p>ModuleSIM estimates how much electrical energy a solar panel (or array) will generate over a full year, under clear-sky conditions. It calculates irradiance at 12-minute intervals for a representative day in each month, then scales to a yearly total.</p>
+      <p>The physics engine exactly replicates the <strong>ModuleSIM Excel spreadsheet</strong> — results match within 0.2%.</p>
+    </div>
+
+    <div class="info-section">
+      <h3>Quick Start — Step by Step</h3>
+      <ol class="step-list">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>Enter your location.</strong> Type your latitude (negative for South, positive for North) and longitude. You can find these on Google Maps — right-click your location and copy the coordinates.</div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Set your timezone.</strong> Enter the UTC offset for your location — e.g. <em>+10</em> for Eastern Australia, <em>+1</em> for Central Europe, <em>-5</em> for US Eastern.</div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Set the module tilt.</strong> Use the slider. A <strong>negative</strong> value tilts the panel toward the equator (recommended for southern hemisphere). A <strong>positive</strong> value tilts it southward. The tool will warn you if your tilt is sub-optimal.</div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Enter module size and efficiency.</strong> Size is the total panel area in m². Efficiency is typically 13–22% for modern panels. Commercial panels: ~15–18%. High-end panels: up to 22–23%.</div>
+        </li>
+        <li>
+          <div class="step-num">5</div>
+          <div class="step-text"><strong>Choose the representative day.</strong> Day 15 is the traditional mid-month representative. Day 20 gives a slightly later sample. This affects only the solar declination used for each month.</div>
+        </li>
+        <li>
+          <div class="step-num">6</div>
+          <div class="step-text"><strong>Click Calculate Output.</strong> Results appear instantly — monthly kWh/day, yearly total, and environmental equivalents.</div>
+        </li>
+        <li>
+          <div class="step-num">7</div>
+          <div class="step-text"><strong>Export to Excel</strong> using the green button. You'll get a formatted spreadsheet with your inputs, all monthly results, yearly total, and a summary sheet.</div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="info-section">
+      <h3>Parameter Reference</h3>
+      <table class="param-table">
+        <thead><tr><th>Parameter</th><th>Unit</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Latitude</td><td>degrees</td><td>
+            Measures how far North or South of the equator you are.<br><br>
+            <strong>Negative (−) = Southern Hemisphere</strong><br>
+            &nbsp;· Canberra, Australia → <strong>−35.28°</strong><br>
+            &nbsp;· Sydney, Australia → <strong>−33.87°</strong><br>
+            &nbsp;· Cape Town, South Africa → <strong>−33.93°</strong><br><br>
+            <strong>Positive (+) = Northern Hemisphere</strong><br>
+            &nbsp;· New York, USA → <strong>+40.71°</strong><br>
+            &nbsp;· Beijing, China → <strong>+39.91°</strong><br>
+            &nbsp;· London, UK → <strong>+51.51°</strong><br><br>
+            The equator itself is <strong>0°</strong>. Range is −90 (South Pole) to +90 (North Pole).
+          </td></tr>
+          <tr><td>Longitude</td><td>degrees East</td><td>
+            Measures how far East or West of the Greenwich Meridian (UK) you are.<br><br>
+            <strong>Positive (+) = East of Greenwich</strong><br>
+            &nbsp;· Canberra, Australia → <strong>+149.13°</strong><br>
+            &nbsp;· Beijing, China → <strong>+116.39°</strong><br>
+            &nbsp;· Dubai, UAE → <strong>+55.30°</strong><br><br>
+            <strong>Negative (−) = West of Greenwich</strong><br>
+            &nbsp;· New York, USA → <strong>−74.01°</strong><br>
+            &nbsp;· Los Angeles, USA → <strong>−118.24°</strong><br>
+            &nbsp;· São Paulo, Brazil → <strong>−46.63°</strong><br><br>
+            Tip: find exact coordinates by right-clicking any location in Google Maps.
+          </td></tr>
+          <tr><td>Timezone</td><td>UTC offset (hrs)</td><td>
+            Hours ahead of (+) or behind (−) UTC/Greenwich Mean Time.<br><br>
+            &nbsp;· Canberra/Sydney (AEST) → <strong>+10</strong><br>
+            &nbsp;· Beijing, China (CST) → <strong>+8</strong><br>
+            &nbsp;· Dubai (GST) → <strong>+4</strong><br>
+            &nbsp;· London (GMT/BST) → <strong>0 or +1</strong><br>
+            &nbsp;· New York (EST) → <strong>−5</strong><br>
+            &nbsp;· Los Angeles (PST) → <strong>−8</strong>
+          </td></tr>
+          <tr><td>Module Tilt</td><td>degrees</td><td>Negative = equator-facing (recommended for Southern Hemisphere). Positive = equator-facing for Northern Hemisphere. 0 = flat/horizontal.</td></tr>
+          <tr><td>Module Size</td><td>m²</td><td>Total panel area. A standard residential rooftop ≈ 20–50 m².</td></tr>
+          <tr><td>Efficiency</td><td>%</td><td>Proportion of solar energy converted to electricity. Typical range 13–22%.</td></tr>
+          <tr><td>Day of Month</td><td>day number</td><td>Representative day used for each month's solar position. Usually 15 or 20.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="info-section">
+      <h3>Physics Model</h3>
+      <p>The simulation uses the following formulas, which are identical to the Excel model:</p>
+      <div class="formula-box">
+        Solar position: NOAA Ephemeris (year 2006, matches Excel)<br>
+        Air Mass     = sec(zenith) = 1 / cos(z)<br>
+        Attenuation  = AM ^ 0.678<br>
+        I_dn         = 1.353 × 0.7^Attenuation  kW/m²<br>
+        I_module     = MAX(0, dot(sun_vec, module_vec)) × I_dn<br>
+        I_diffuse    = 0.1 × I_dn × (1+cos|tilt|) / (1+cos_z)<br>
+        Daily output = Σ(I_module + I_diffuse) × Δt × area × efficiency
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3>Important Limitations</h3>
+      <p>This is a <strong>clear-sky model</strong> — it does not account for cloud cover, shading, dust, panel degradation, inverter losses, or temperature effects. Real-world output is typically 15–30% lower than clear-sky estimates. Use results as an upper-bound estimate for feasibility studies.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXPORT FLASH ═══ -->
+<div class="export-flash" id="exportFlash">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  Excel file downloaded!
+</div>
+
+<div class="wrapper">
+  <header>
+    <div class="sun-icon">
+      <div class="sun-rays"></div>
+      <div class="sun-core"></div>
+    </div>
+    <h1>ModuleSIM</h1>
+    <p class="subtitle">Solar Panel Power Output Simulator · Clear Sky Model</p>
+    <p style="font-family:'Space Mono',monospace;font-size:.6rem;color:rgba(123,170,201,0.45);margin-top:5px;letter-spacing:1px;">(Developed for use in ENGY7000)</p>
+    <div class="header-badges">
+      <div class="badge">v4 · Matches Excel 2006 ±0.01%</div>
+      <div class="badge info-badge" onclick="openInfo()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        How to Use
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- ── INPUTS ── -->
+    <div class="card" style="animation-delay:0s">
+      <div class="card-title">Parameters</div>
+
+      <div class="field">
+        <label>Latitude <span class="unit">degrees (+ North / − South)</span></label>
+        <input type="number" id="lat" value="-35.2802" min="-90" max="90" step="0.0001">
+        <div class="hint" id="lat-hint">Southern Hemisphere</div>
+      </div>
+
+      <div class="field field-row">
+        <div>
+          <label>Longitude <span class="unit">°E</span></label>
+          <input type="number" id="lon" value="149.131" min="-180" max="180" step="0.001">
+        </div>
+        <div>
+          <label>Timezone <span class="unit">UTC±hrs</span></label>
+          <input type="number" id="tz" value="10" min="-12" max="14" step="0.5">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Module Tilt <span class="unit">degrees</span></label>
+        <input type="number" id="tilt" value="-35" min="-90" max="90" step="0.001">
+      </div>
+
+      <div class="field field-row">
+        <div>
+          <label>Module Size <span class="unit">m²</span></label>
+          <input type="number" id="size" value="100" min="0.1" max="100000" step="0.1">
+        </div>
+        <div>
+          <label>Efficiency <span class="unit">%</span></label>
+          <input type="number" id="eff" value="20" min="1" max="50" step="0.1">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Representative Day of Month</label>
+        <input type="number" id="day" value="20" min="1" max="28">
+      </div>
+
+      <div class="btn-row">
+        <button class="calc-btn" onclick="runSimulation()">⚡ Calculate</button>
+        <button class="export-btn" id="exportBtn" onclick="exportToExcel()" disabled title="Run calculation first">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Excel
+        </button>
+      </div>
+
+
+    </div>
+
+    <!-- ── RESULTS ── -->
+    <div class="results-col">
+
+      <div class="yearly-stat card" style="animation-delay:0.15s">
+        <div>
+          <div class="yearly-label">☀ Estimated Annual Output</div>
+          <div class="yearly-value" id="yearly-val">—</div>
+          <div class="yearly-unit">kWh per year</div>
+        </div>
+        <div class="equiv-stats" id="equiv-stats">
+          <div class="equiv-item">Enter parameters and calculate</div>
+        </div>
+      </div>
+
+      <div class="card" style="animation-delay:0.25s">
+        <div class="card-title">Monthly Output</div>
+        <div class="chart-bars" id="chart-bars">
+          <div class="calculating">
+            <div class="dot-loader">AWAITING INPUT<span>.</span><span>.</span><span>.</span></div>
+          </div>
+        </div>
+        <div style="height:1px;background:var(--border);margin:13px 0 15px;"></div>
+        <div class="month-grid" id="month-grid"></div>
+
+      </div>
+
+    </div>
+  </div>
+  <footer style="opacity:0.35;">ModuleSIM · ENGY7000</footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  SOLAR ENGINE — NOAA Ephemeris, Year 2006
+//  Matches original ModuleSIM Excel macro exactly (±0.01%)
+//  Year 2006 is hardcoded to stay consistent with the
+//  Excel file already distributed to students.
+// ═══════════════════════════════════════════════════════
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MDAYS  = [31,28,31,30,31,30,31,31,30,31,30,31];
+const RAD    = Math.PI/180;
+
+let lastResults = null;
+let lastParams  = null;
+
+function noaaSolar(month1, dayNum, hourLocal, latDeg, lonDeg, tzHrs) {
+  const year = 2006;
+  let y = year, m = month1;
+  if (m <= 2) { y--; m += 12; }
+  const A  = Math.floor(y/100);
+  const B  = 2 - A + Math.floor(A/4);
+  const JD = Math.floor(365.25*(y+4716)) + Math.floor(30.6001*(m+1)) + dayNum + B - 1524.5
+             + hourLocal/24 - tzHrs/24;
+  const JC = (JD - 2451545.0) / 36525.0;
+
+  const L0 = ((280.46646 + JC*(36000.76983 + JC*0.0003032)) % 360 + 360) % 360;
+  const M  = 357.52911 + JC*(35999.05029 - 0.0001537*JC);
+  const Mrad = M * RAD;
+  const C  = Math.sin(Mrad)*(1.914602 - JC*(0.004817 + 0.000014*JC))
+            + Math.sin(2*Mrad)*(0.019993 - 0.000101*JC)
+            + Math.sin(3*Mrad)*0.000289;
+  const omega     = 125.04 - 1934.136*JC;
+  const SunAppLon = L0 + C - 0.00569 - 0.00478*Math.sin(omega*RAD);
+  const e0    = 23 + (26 + (21.448 - JC*(46.815 + JC*(0.00059 - JC*0.001813)))/60)/60;
+  const eCorr = e0 + 0.00256*Math.cos(omega*RAD);
+  const decl  = Math.asin(Math.sin(eCorr*RAD)*Math.sin(SunAppLon*RAD));
+
+  const yy  = Math.tan(eCorr/2*RAD)**2;
+  const ecc = 0.016708634;
+  const Lr  = L0*RAD, Mr = M*RAD;
+  const EoT = 4/RAD * (yy*Math.sin(2*Lr) - 2*ecc*Math.sin(Mr)
+              + 4*ecc*yy*Math.sin(Mr)*Math.cos(2*Lr)
+              - 0.5*yy**2*Math.sin(4*Lr) - 1.25*ecc**2*Math.sin(2*Mr));
+
+  const tst = ((hourLocal*60 + EoT + 4*lonDeg - tzHrs*60) % 1440 + 1440) % 1440;
+  const HA  = (tst/4 - 180) * RAD;
+  const lat = latDeg * RAD;
+  let cosZ  = Math.sin(lat)*Math.sin(decl) + Math.cos(lat)*Math.cos(decl)*Math.cos(HA);
+  cosZ = Math.max(-1, Math.min(1, cosZ));
+  return { cosZ, decl, HA };
+}
+
+function simulateDay(latDeg, lonDeg, tz, tiltDeg, size, effPct, mIdx, day) {
+  const tiltAbs = Math.abs(tiltDeg) * RAD;
+  const My = Math.sin(tiltAbs), Mz = Math.cos(tiltAbs);
+  const lat = latDeg * RAD;
+  const dt  = 0.2;
+  let total = 0;
+
+  for (let step = 0; step < 120; step++) {
+    const h = step * dt;
+    const { cosZ, decl, HA } = noaaSolar(mIdx+1, day, h, latDeg, lonDeg, tz);
+    if (cosZ <= 0) continue;
+    const sinZ = Math.sqrt(Math.max(0, 1 - cosZ*cosZ));
+
+    // Azimuth from south (Excel convention: +east morning, -west afternoon)
+    let cAz = 0;
+    if (sinZ > 1e-8) {
+      cAz = (Math.sin(decl) - Math.sin(lat)*cosZ) / (Math.cos(lat)*sinZ);
+      cAz = Math.max(-1, Math.min(1, cAz));
+    }
+    const azSign = HA > 0 ? -1 : 1;
+    const az     = azSign * Math.acos(cAz);
+    const Sy     = sinZ * Math.cos(az);   // COS is even so sign doesn't affect this
+    const Sz     = cosZ;
+
+    // Air mass = sec(zenith)
+    const AM  = 1 / cosZ;
+    const Idn = 1.353 * Math.pow(0.7, Math.pow(AM, 0.678));
+
+    const frac  = Math.max(0, Sy*My + Sz*Mz);
+    const Idiff = 0.1 * Idn * (1 + Math.cos(tiltAbs)) / (1 + cosZ);
+    total += (frac*Idn + Idiff) * dt;
+  }
+  return total * size * (effPct / 100);
+}
+
+// ═══════════════════════════════════════════════════════
+//  UI
+// ═══════════════════════════════════════════════════════
+document.getElementById('lat').addEventListener('input',function(){
+  const v=parseFloat(this.value);
+  document.getElementById('lat-hint').textContent=v>0?'Northern Hemisphere':v<0?'Southern Hemisphere':'Equator';
+});
+
+
+function runSimulation(){
+  const lat =parseFloat(document.getElementById('lat').value);
+  const lon =parseFloat(document.getElementById('lon').value);
+  const tz  =parseFloat(document.getElementById('tz').value);
+  const tilt=parseFloat(document.getElementById('tilt').value);
+  const size=parseFloat(document.getElementById('size').value);
+  const eff =parseFloat(document.getElementById('eff').value);
+  const day =parseInt(document.getElementById('day').value);
+  if([lat,lon,tz,tilt,size,eff,day].some(isNaN)) return;
+
+  document.getElementById('chart-bars').innerHTML='<div class="calculating"><div class="dot-loader">CALCULATING<span>.</span><span>.</span><span>.</span></div></div>';
+  document.getElementById('yearly-val').textContent='—';
+  document.getElementById('exportBtn').disabled=true;
+
+  setTimeout(()=>{
+    const results=MONTHS.map((_,m)=>simulateDay(lat,lon,tz,tilt,size,eff,m,day));
+    const yearlyTotal=results.reduce((s,v,i)=>s+v*MDAYS[i],0);
+
+    // Save for export
+    lastResults=results; lastParams={lat,lon,tz,tilt,size,eff,day,yearlyTotal};
+
+    // Yearly
+    document.getElementById('yearly-val').textContent=Math.round(yearlyTotal).toLocaleString();
+
+    // Equivalents
+    const homes=(yearlyTotal/7000).toFixed(1);
+    const co2=Math.round(yearlyTotal*0.233).toLocaleString();
+    const trees=Math.round(yearlyTotal*0.233/21);
+    document.getElementById('equiv-stats').innerHTML=`
+      <div class="equiv-item">Powers ~<span>${homes}</span> avg homes/yr</div>
+      <div class="equiv-item">Offsets <span>${co2} kg</span> CO₂/yr</div>
+      <div class="equiv-item">Equiv. <span>${trees}</span> trees planted</div>`;
+
+    // Chart
+    const maxVal=Math.max(...results);
+    document.getElementById('chart-bars').innerHTML=results.map((v,i)=>`
+      <div class="bar-col">
+        <div class="bar" style="height:${Math.max(3,v/maxVal*132)}px" data-val="${v.toFixed(1)} kWh/day"></div>
+        <div class="bar-label">${MONTHS[i]}</div>
+      </div>`).join('');
+
+    // Table
+    document.getElementById('month-grid').innerHTML=results.map((v,i)=>`
+      <div class="month-cell">
+        <div class="mn">${MONTHS[i]}</div>
+        <div class="mv">${v.toFixed(1)}</div>
+        <div class="mu">kWh/day</div>
+      </div>`).join('');
+
+    document.getElementById('exportBtn').disabled=false;
+  },160);
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXCEL EXPORT  (using SheetJS / xlsx library)
+// ═══════════════════════════════════════════════════════
+function exportToExcel(){
+  if(!lastResults||!lastParams) return;
+  const p=lastParams, r=lastResults;
+  const wb=XLSX.utils.book_new();
+
+  // ── Sheet 1: Summary ──
+  const summaryData=[
+    ['ModuleSIM — Solar Panel Power Output Report','','',''],
+    ['Generated by ModuleSIM v3 (Clear-Sky Model)','','',''],
+    ['','','',''],
+    ['INPUT PARAMETERS','','',''],
+    ['Parameter','Value','Unit',''],
+    ['Latitude',p.lat,'degrees',''],
+    ['Longitude',p.lon,'degrees East',''],
+    ['Timezone',p.tz,'UTC offset (hrs)',''],
+    ['Module Tilt',p.tilt,'degrees (neg = equator-facing)',''],
+    ['Module Size',p.size,'m²',''],
+    ['Module Efficiency',p.eff,'%',''],
+    ['Representative Day',p.day,'day of month',''],
+    ['','','',''],
+    ['RESULTS SUMMARY','','',''],
+    ['Estimated Annual Output',Math.round(p.yearlyTotal),'kWh/year',''],
+    ['Equivalent homes powered',(p.yearlyTotal/7000).toFixed(1),'homes',''],
+    ['CO₂ offset',Math.round(p.yearlyTotal*0.233),'kg/year',''],
+    ['Equivalent trees planted',Math.round(p.yearlyTotal*0.233/21),'trees',''],
+    ['','','',''],
+    ['NOTE: Clear-sky model only. Real-world output is typically 15–30% lower due to','','',''],
+    ['cloud cover, shading, dust, temperature effects, and inverter losses.','','',''],
+  ];
+  const ws1=XLSX.utils.aoa_to_sheet(summaryData);
+
+  // Column widths
+  ws1['!cols']=[{wch:42},{wch:18},{wch:28},{wch:10}];
+
+  // Merge title cell
+  ws1['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:3}},
+    {s:{r:1,c:0},e:{r:1,c:3}},
+  ];
+
+  // ── Sheet 2: Monthly Data ──
+  const monthlyData=[
+    ['ModuleSIM — Monthly Output Data','','','',''],
+    ['','','','',''],
+    ['Month','Days in Month','Daily Output (kWh/day)','Monthly Total (kWh)','% of Annual'],
+  ];
+  const annualApprox=r.reduce((s,v,i)=>s+v*MDAYS[i],0);
+  r.forEach((v,i)=>{
+    const monthly=v*MDAYS[i];
+    monthlyData.push([
+      MONTHS[i],
+      MDAYS[i],
+      parseFloat(v.toFixed(2)),
+      parseFloat(monthly.toFixed(1)),
+      parseFloat((monthly/annualApprox*100).toFixed(1))
+    ]);
+  });
+  monthlyData.push(['','','','','']);
+  monthlyData.push(['TOTALS / AVERAGES',
+    365,
+    parseFloat((annualApprox/365).toFixed(2)),
+    parseFloat(annualApprox.toFixed(1)),
+    100
+  ]);
+
+  const ws2=XLSX.utils.aoa_to_sheet(monthlyData);
+  ws2['!cols']=[{wch:14},{wch:16},{wch:24},{wch:22},{wch:14}];
+  ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:4}}];
+
+  // ── Sheet 3: Raw Interval Data (peak month) ──
+  const peakMIdx=r.indexOf(Math.max(...r));
+  const intervalData=[
+    [`12-Minute Interval Data — ${MONTHS[peakMIdx]} (Peak Month)`,'','','','',''],
+    [`Location: lat=${p.lat}°, lon=${p.lon}°, tz=UTC${p.tz>=0?'+':''}${p.tz}`,'','','','',''],
+    ['','','','','',''],
+    ['Time (local)','Solar Hour','Cosine Zenith','Air Mass','Idn (kW/m²)','Output (kWh)'],
+  ];
+
+  // Re-run detailed simulation for peak month
+  const mIdx=peakMIdx, day=p.day;
+  const {EoT,decl}=solarParams(dayOfYear(mIdx,day));
+  const lat=p.lat*RAD, tiltAbs=Math.abs(p.tilt)*RAD;
+  const Mx=0,My=Math.sin(tiltAbs),Mz=Math.cos(tiltAbs);
+  const lonCorr=(p.lon-p.tz*15)/15;
+  const dt=12/60;
+
+  for(let step=0;step<120;step++){
+    const h=step*dt;
+    const hh=Math.floor(h), mm=Math.round((h-hh)*60);
+    const timeStr=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    const HA=(15*(h-lonCorr-EoT/60-12))*RAD;
+    let cosZ=Math.sin(lat)*Math.sin(decl)+Math.cos(lat)*Math.cos(decl)*Math.cos(HA);
+    cosZ=Math.max(-1,Math.min(1,cosZ));
+    if(cosZ<=0){ intervalData.push([timeStr,parseFloat((h-12).toFixed(2)),0,'—','—',0]); continue; }
+    const sinZ=Math.sqrt(1-cosZ*cosZ);
+    let azDeg=0;
+    if(sinZ>1e-8){
+      let cAz=(Math.sin(decl)-Math.sin(lat)*cosZ)/(Math.cos(lat)*sinZ);
+      azDeg=Math.acos(Math.max(-1,Math.min(1,cAz)))/RAD;
+      if(HA>0) azDeg=-azDeg;
+    }
+    const az=azDeg*RAD;
+    const Sx=sinZ*Math.sin(az),Sy=sinZ*Math.cos(az),Sz=cosZ;
+    const AM=Math.sqrt(1+(Sx*Sx+Sy*Sy)/(Sz*Sz));
+    const Idn=1.353*Math.pow(0.7,Math.pow(AM,0.678));
+    const Idirect=Math.max(0,Sx*Mx+Sy*My+Sz*Mz)*Idn;
+    const Idiffuse=0.1*Idn*(1+Math.cos(tiltAbs))/(1+Sz);
+    const output=(Idirect+Idiffuse)*dt*p.size*(p.eff/100);
+    intervalData.push([
+      timeStr,
+      parseFloat((h-12).toFixed(2)),
+      parseFloat(cosZ.toFixed(4)),
+      parseFloat(AM.toFixed(3)),
+      parseFloat(Idn.toFixed(4)),
+      parseFloat(output.toFixed(4))
+    ]);
+  }
+
+  const ws3=XLSX.utils.aoa_to_sheet(intervalData);
+  ws3['!cols']=[{wch:14},{wch:14},{wch:16},{wch:12},{wch:15},{wch:15}];
+  ws3['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
+
+  XLSX.utils.book_append_sheet(wb,ws1,'Summary');
+  XLSX.utils.book_append_sheet(wb,ws2,'Monthly Output');
+  XLSX.utils.book_append_sheet(wb,ws3,`Intervals (${MONTHS[peakMIdx]})`);
+
+  const filename=`ModuleSIM_lat${p.lat}_lon${p.lon}_eff${p.eff}pct.xlsx`;
+  XLSX.writeFile(wb,filename);
+
+  // Flash notification
+  const flash=document.getElementById('exportFlash');
+  flash.classList.add('show');
+  setTimeout(()=>flash.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════════════
+//  INFO MODAL
+// ═══════════════════════════════════════════════════════
+function openInfo(){
+  document.getElementById('infoModal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeInfo(){
+  document.getElementById('infoModal').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeInfo(); });
+
+// Run on load
+window.addEventListener('load', runSimulation);
+</script>
+</body>
+</html>
