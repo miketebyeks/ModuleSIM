@@ -953,9 +953,12 @@ function solarAngles(localHour, lat, lon, tz, doy) {
   const zenith = 90 - elevation / DEG;
 
   let azimuth = 0;
-  const cosAz = (Math.sin(decR) - Math.sin(latR) * sinEl) / (Math.cos(latR) * Math.cos(elevation));
-  azimuth = Math.acos(Math.max(-1, Math.min(1, cosAz))) / DEG;
-  if (hourAngle > 0) azimuth = 360 - azimuth;
+  const cosElev = Math.cos(elevation);
+  if (Math.abs(cosElev) > 1e-9 && Math.abs(Math.cos(latR)) > 1e-9) {
+    const cosAz = (Math.sin(decR) - Math.sin(latR) * sinEl) / (Math.cos(latR) * cosElev);
+    azimuth = Math.acos(Math.max(-1, Math.min(1, cosAz))) / DEG;
+    if (hourAngle > 0) azimuth = 360 - azimuth;
+  }
 
   return { zenith, azimuth, elevation: elevation / DEG };
 }
@@ -987,7 +990,8 @@ function calcIrradiance(zenith, azimuth, tiltDeg) {
   // Air mass (Excel: sqrt(1 + (sx^2+sy^2)/sz^2))
   let airMass = Infinity;
   if (sz > 0.01) {
-    airMass = Math.sqrt(1 + (sx*sx + sy*sy) / (sz*sz));
+    const amArg = 1 + (sx*sx + sy*sy) / (sz*sz);
+    airMass = Math.sqrt(Math.max(0, amArg)); // guard negative due to floating point
   }
 
   // Sun above horizon?
@@ -1024,8 +1028,9 @@ function dailyEnergy(month, day, lat, lon, tz, tiltDeg) {
   for (let h = 0; h < 24; h += dt) {
     const { zenith, azimuth, elevation } = solarAngles(h, lat, lon, tz, doy);
     const irr = calcIrradiance(zenith, azimuth, tiltDeg);
-    total += irr.total * dt; // kWh/m2 for this step
-    if (month === 1) profile.push({ h, irr: irr.total, elevation });
+    const stepVal = irr.total * dt;
+    if (isFinite(stepVal)) total += stepVal; // guard against NaN/Infinity
+    if (month === 1) profile.push({ h, irr: isFinite(irr.total) ? irr.total : 0, elevation });
   }
 
   return { kwhPerM2: total, profile };
@@ -1054,7 +1059,7 @@ function runSim() {
     const d = Math.min(day, MONTH_DAYS[m-1]);
     const { kwhPerM2, profile } = dailyEnergy(m, d, lat, lon, tz, tilt);
     const kwhPerDay = kwhPerM2 * area * eff;
-    results.push(kwhPerDay);
+    results.push(isFinite(kwhPerDay) ? kwhPerDay : 0);
     if (m === 1) janProfile = profile;
   }
 
